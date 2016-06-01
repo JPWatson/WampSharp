@@ -1,50 +1,50 @@
 ﻿#if PCL
-using System;
-using System.Threading.Tasks;
 using WampSharp.V2.Binding;
 using WampSharp.Core.Message;
 
 namespace WampSharp.WebsocketsPcl
 {
+    /// <summary>
+    /// Represents a client WebSocket text connection implemented using WebSocket4Net.
+    /// </summary>
+    /// <typeparam name="TMessage"></typeparam>
     public class MessageWebSocketTextConnection<TMessage> : MessageWebSocketConnection<TMessage>
     {
-        private readonly IWampTextBinding<TMessage> mTextBinding;
+        private readonly IWampTextBinding<TMessage> mBinding;
 
-        public MessageWebSocketTextConnection(string uri, IWampTextBinding<TMessage> binding) :
-            base(uri, binding)
+        /// <summary>
+        /// Creates a new instance of <see cref="MessageWebSocketTextConnection{TMessage}"/>
+        /// given the server address to connect to and the text binding to use.
+        /// </summary>
+        /// <param name="serverAddress">The server address to connect to.</param>
+        /// <param name="binding">The <see cref="IWampTextBinding{TMessage}"/> to use.</param>
+        public MessageWebSocketTextConnection(string serverAddress, IWampTextBinding<TMessage> binding)
+            : base(serverAddress, binding)
         {
-            mTextBinding = binding;
+            mBinding = binding;
+            WebSocket.OnMessage += OnMessageReceived;
         }
 
-        protected override void OnMessageReceived(string rawMessage)
+        private void OnMessageReceived(string m)
         {
-            try
-            {
-                var message = mTextBinding.Parse(rawMessage);
+            WampMessage<TMessage> message = mBinding.Parse(m);
 
-                RaiseMessageArrived(message);
-            }
-            catch (Exception ex)
-            {
-                RaiseConnectionError(ex);
-                mWebSocket?.Dispose();
-            }
+            RaiseMessageArrived(message);
         }
 
-        protected override async Task SendAsync(WampMessage<object> message)
+        protected override void Send(WampMessage<object> message)
         {
-            try
-            {
-                var frame = mTextBinding.Format(message);
-                mWebSocket.Send(frame);
-            }
-            catch (Exception ex)
-            {
-                RaiseConnectionError(ex);
-                mWebSocket?.Dispose();
-                throw;
-            }
+            string text = mBinding.Format(message);
+
+            WebSocket.Send(text);
+        }
+
+        public override void Dispose()
+        {
+            WebSocket.OnMessage -= OnMessageReceived;
+            base.Dispose();
         }
     }
 }
+
 #endif
